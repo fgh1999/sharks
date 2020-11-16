@@ -49,19 +49,46 @@ pub fn random_polynomial<R: rand::Rng>(s: GF256, k: u8, rng: &mut R) -> Vec<GF25
 // Each item of the iterator is a tuple `(x, [f_1(x), f_2(x)..])` where eaxh `f_i` is the result for the ith polynomial.
 // Each polynomial corresponds to one byte chunk of the original secret.
 // The iterator will start at `x = 1` and end at `x = 255`.
+// 
+// ploys: Vec<Vec<GF256>>
+// ```
+// ..., ..., s[0] // fronter, heavier weight it owned $x^(k-1), ..., x^0$
+// ..., ..., s[1]
+//      ...
+// ..., ..., s[i]
+//      ...
+// ..., ..., s[n]
+// ```
+// where `...` here means some random integer in $[1, 255]$. `s[i]` means GF256(the ith byte of secret) 
 pub fn get_evaluator(polys: Vec<Vec<GF256>>) -> impl Iterator<Item = Share> {
     (1..=u8::max_value()).map(GF256).map(move |x| Share {
         x,
-        y: polys
-            .iter()
-            .map(|p| p.iter().fold(GF256(0), |acc, c| acc * x + *c))
+        y: polys.iter()
+            .map(|p| p.iter().fold(GF256(0), |acc, c| acc * x + *c)) // figure out the result of f_i
+            .collect(),
+    })
+}
+
+/// Returns the `x`th share
+/// where `x` starts from 1 to 255.
+/// (Return `Err` when `x` exceeds this limitation.)
+pub fn get_xth_share(ploys: &Vec<Vec<GF256>>, x: u8) -> Result<Share, &'static str> {
+    if x == 0 {
+        return Err("x cannot be 0");
+    }
+
+    let x = GF256(x);
+    Ok(Share {
+        x,
+        y: ploys.iter()
+            .map(|p| p.iter().fold(GF256(0), |acc, c| acc * x + *c)) // figure out the result of f_i
             .collect(),
     })
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{get_evaluator, interpolate, random_polynomial, Share, GF256};
+    use super::{get_evaluator, interpolate, random_polynomial, Share, GF256, get_xth_share};
     use alloc::{vec, vec::Vec};
     use rand_chacha::rand_core::SeedableRng;
 
@@ -91,5 +118,20 @@ mod tests {
         let shares: Vec<Share> = iter.take(10).collect();
         let root = interpolate(&shares);
         assert_eq!(root, vec![185]);
+    }
+
+    #[test]
+    fn get_xth_share_works() {
+        let polys = vec![vec![GF256(3), GF256(2), GF256(5)]];
+        let value_1 = get_xth_share(&polys, 1);
+        let value_2 = get_xth_share(&polys, 2);
+        assert_eq!(value_1.unwrap(), Share {
+            x: GF256(1),
+            y: vec![GF256(4)]
+        });
+        assert_eq!(value_2.unwrap(), Share {
+            x: GF256(2),
+            y: vec![GF256(13)]
+        });
     }
 }

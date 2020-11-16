@@ -29,10 +29,13 @@ use arbitrary::Arbitrary;
 /// let shares_bytes: Vec<Vec<u8>> = ask_shares();
 /// let shares: Vec<Share> = shares_bytes.iter().map(|s| Share::try_from(s.as_slice()).unwrap()).collect();
 /// let secret = sharks.recover(&shares).unwrap();
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "fuzzing", derive(Arbitrary, Debug))]
 pub struct Share {
+    /// indicates that this is the xth share: the parameter of ploynomial `f_i(x)` in `self.y`.
     pub x: GF256,
+
+    /// `[f_1(x), f_2(x)..]` where eaxh `f_i(x)` is the result for the ith polynomial.
     pub y: Vec<GF256>,
 }
 
