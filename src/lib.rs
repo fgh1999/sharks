@@ -45,7 +45,7 @@ extern crate alloc;
 use alloc::vec::Vec;
 use hashbrown::HashSet;
 
-use field::GF256;
+pub use field::GF256;
 pub use share::Share;
 
 /// Tuple struct which implements methods to generate shares and recover secrets over a 256 bits Galois Field.
