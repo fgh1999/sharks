@@ -335,7 +335,6 @@ mod tests {
     use alloc::vec::Vec;
     use rand_chacha::rand_core::SeedableRng;
     use super::SecretType;
-    use crate::share::Share;
 
     #[test]
     fn random_polynomial_works() {
@@ -370,13 +369,13 @@ mod tests {
         let polys = vec![vec![GF256(3), GF256(2), GF256(5)]];
         let value_1 = GF256::get_xth_share(&polys, 1);
         let value_2 = GF256::get_xth_share(&polys, 2);
-        assert_eq!(value_1.unwrap(), Share {
-            x: 1,
-            y: vec![GF256(4)]
-        });
-        assert_eq!(value_2.unwrap(), Share {
-            x: 2,
-            y: vec![GF256(13)]
-        });
+
+        let value_1 = value_1.unwrap();
+        assert_eq!(value_1.x, 1);
+        assert_eq!(value_1.y, vec![GF256(4)]);
+
+        let value_2 = value_2.unwrap();
+        assert_eq!(value_2.x, 2);
+        assert_eq!(value_2.y, vec![GF256(13)]);
     }
 }
