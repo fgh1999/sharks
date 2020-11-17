@@ -65,6 +65,101 @@ const EXP_TABLE: [u8; 512] = [
 #[cfg_attr(feature = "fuzzing", derive(Arbitrary))]
 pub struct GF256(pub u8);
 
+use super::SecretType;
+use super::super::share::Share;
+impl SecretType for GF256 {
+    type Inner = u8;
+    fn get_inner(&self) -> Self::Inner {
+        self.0
+    }
+
+    fn get_add_identity_elem() -> Self {
+        GF256(0)
+    }
+
+    fn get_mul_identity_elem() -> Self {
+        GF256(1)
+    }
+    
+    fn deal<R: rand::Rng> (
+        threshold: u8,
+        secret: &[Self::Inner],
+        rng: &mut R,
+    ) -> Box<dyn Iterator<Item = Share<Self>>> {
+        let mut polys = Vec::with_capacity(secret.len());
+
+        for chunk in secret {
+            polys.push(Self::random_polynomial(GF256(*chunk), threshold, rng))
+        }
+
+        Box::new(Self::get_evaluator(polys))
+    }
+
+
+    fn interpolate(shares: &[Share<Self>]) -> Vec<Self::Inner> {
+        (0..shares[0].y.len())
+            .map(|s| {
+                shares
+                    .iter()
+                    .map(|s_i| {
+                        let product = shares
+                                        .iter()
+                                        .filter(|s_j| s_j.x != s_i.x)
+                                        .map(|s_j|
+                                            Self::from(s_j.x) / (Self::from(s_j.x) - Self::from(s_i.x)))
+                                        .product::<Self>();
+                        product * s_i.y[s]
+                    })
+                    .sum::<Self>()
+                    .get_inner()
+            })
+        .collect()
+    }
+
+    fn random_polynomial<R: rand::Rng>(s: Self, k: u8, rng: &mut R) -> Vec<Self> {
+        use rand::distributions::{Uniform, Distribution};
+        let k = k as usize;
+        let mut poly = Vec::with_capacity(k);
+        let between = Uniform::new_inclusive(1, 255);
+
+        for _ in 1..k {
+            poly.push(GF256(between.sample(rng)));
+        }
+        poly.push(s);
+
+        poly
+    }
+
+    fn get_evaluator(polys: Vec<Vec<Self>>) -> Box<dyn Iterator<Item = Share<Self>>> {
+        Box::new((1..=u8::max_value()).map(move |x| Share {
+            x,
+            y: polys.iter()
+                .map(|p| // figure out the result of f_i
+                    p.iter().fold(GF256(0), |acc, c| acc * x + *c)) 
+                .collect(),
+        }))
+    }
+    
+    fn get_xth_share(ploys: &Vec<Vec<Self>>, x: u8) -> Result<Share<Self>, &'static str> {
+        if x == 0 {
+            return Err("x cannot be 0");
+        }
+
+        Ok(Share {
+            x,
+            y: ploys.iter()
+                .map(|p| p.iter().fold(Self::get_add_identity_elem(), |acc, c| *c + (acc * x))) // figure out the result of f_i
+                .collect(),
+        })
+    }
+}
+
+impl From<u8> for GF256 {
+    fn from(x: u8) -> Self {
+        GF256(x)
+    }
+}
+
 #[allow(clippy::suspicious_arithmetic_impl)]
 impl Add for GF256 {
     type Output = GF256;
@@ -92,6 +187,22 @@ impl Mul for GF256 {
         let log_y = LOG_TABLE[other.0 as usize] as usize;
 
         if self.0 == 0 || other.0 == 0 {
+            Self(0)
+        } else {
+            Self(EXP_TABLE[log_x + log_y])
+        }
+    }
+}
+
+#[allow(clippy::suspicious_arithmetic_impl)]
+impl Mul<u8> for GF256 {
+    type Output = Self;
+
+    fn mul(self, other: u8) -> Self::Output {
+        let log_x = LOG_TABLE[self.0 as usize] as usize;
+        let log_y = LOG_TABLE[other as usize] as usize;
+
+        if self.0 == 0 || other == 0 {
             Self(0)
         } else {
             Self(EXP_TABLE[log_x + log_y])
@@ -219,5 +330,53 @@ mod tests {
     fn product_works() {
         let values = vec![GF256(1), GF256(1), GF256(4)];
         assert_eq!(values.into_iter().product::<GF256>().0, 4);
+    }
+
+    use alloc::vec::Vec;
+    use rand_chacha::rand_core::SeedableRng;
+    use super::SecretType;
+    use crate::share::Share;
+
+    #[test]
+    fn random_polynomial_works() {
+        let mut rng = rand_chacha::ChaCha8Rng::from_seed([0x90; 32]);
+        let poly = GF256::random_polynomial(GF256(1), 3, &mut rng);
+        assert_eq!(poly.len(), 3);
+        assert_eq!(poly[2], GF256(1));
+    }
+
+    #[test]
+    fn evaluator_works() {
+        let iter = GF256::get_evaluator(vec![vec![GF256(3), GF256(2), GF256(5)]]);
+        let values: Vec<_> = iter.take(2).map(|s| (s.x, s.y)).collect();
+        assert_eq!(
+            values,
+            vec![(1, vec![GF256(4)]), (2, vec![GF256(13)])]
+        );
+    }
+
+    #[test]
+    fn interpolate_works() {
+        let mut rng = rand_chacha::ChaCha8Rng::from_seed([0x90; 32]);
+        let poly = GF256::random_polynomial(GF256(185), 10, &mut rng);
+        let iter = GF256::get_evaluator(vec![poly]);
+        let shares: Vec<_> = iter.take(10).collect();
+        let root = GF256::interpolate(&shares);
+        assert_eq!(root, vec![185]);
+    }
+
+    #[test]
+    fn get_xth_share_works() {
+        let polys = vec![vec![GF256(3), GF256(2), GF256(5)]];
+        let value_1 = GF256::get_xth_share(&polys, 1);
+        let value_2 = GF256::get_xth_share(&polys, 2);
+        assert_eq!(value_1.unwrap(), Share {
+            x: 1,
+            y: vec![GF256(4)]
+        });
+        assert_eq!(value_2.unwrap(), Share {
+            x: 2,
+            y: vec![GF256(13)]
+        });
     }
 }
