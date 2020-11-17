@@ -135,7 +135,7 @@ impl SecretType for GF256 {
             x,
             y: polys.iter()
                 .map(|p| // figure out the result of f_i
-                    p.iter().fold(GF256(0), |acc, c| acc * x + *c)) 
+                    p.iter().fold(Self::get_add_identity_elem(), |acc, c| acc * x + *c)) 
                 .collect(),
         }))
     }
