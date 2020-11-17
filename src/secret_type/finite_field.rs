@@ -228,13 +228,13 @@ impl Div for GF256 {
 
 impl Sum for GF256 {
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
-        iter.fold(Self(0), |acc, x| acc + x)
+        iter.fold(Self::get_add_identity_elem(), |acc, x| acc + x)
     }
 }
 
 impl Product for GF256 {
     fn product<I: Iterator<Item = Self>>(iter: I) -> Self {
-        iter.fold(Self(1), |acc, x| acc * x)
+        iter.fold(Self::get_mul_identity_elem(), |acc, x| acc * x)
     }
 }
 
