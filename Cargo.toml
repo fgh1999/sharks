@@ -22,13 +22,13 @@ std = ["rand/std"]
 fuzzing = ["std", "arbitrary"]
 
 [dependencies]
-rand = { version = "0.7", default-features = false }
-hashbrown = "0.7"
-arbitrary = {version = "0.4.2", features = ["derive"], optional = true}
+rand = { version = "^0.7", default-features = false }
+hashbrown = "^0.7"
+arbitrary = {version = "^0.4", features = ["derive"], optional = true}
 
 [dev-dependencies]
-criterion = "0.3"
-rand_chacha = "0.2"
+criterion = "^0.3"
+rand_chacha = "^0.2"
 
 [[bench]]
 name = "benchmarks"
