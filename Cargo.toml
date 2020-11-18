@@ -25,6 +25,8 @@ fuzzing = ["std", "arbitrary"]
 rand = { version = "^0.7", default-features = false }
 hashbrown = "^0.7"
 arbitrary = {version = "^0.4", features = ["derive"], optional = true}
+num-rational = "^0.3"
+num-traits = "^0.2.11"
 
 [dev-dependencies]
 criterion = "^0.3"

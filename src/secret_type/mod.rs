@@ -56,3 +56,4 @@ pub trait SecretType: 'static + Add + Div + Sub + Mul + Sum + Product + Mul<u8> 
 }
 
 pub mod finite_field;
+pub mod rational;

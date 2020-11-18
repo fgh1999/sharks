@@ -38,13 +38,13 @@
 //! ```
 #![cfg_attr(not(feature = "std"), no_std)]
 
-mod share;
 pub mod secret_type;
+mod share;
 
 extern crate alloc;
 
-use alloc::vec::Vec;
 use alloc::boxed::Box;
+use alloc::vec::Vec;
 use hashbrown::HashSet;
 
 use secret_type::SecretType;
@@ -76,9 +76,7 @@ pub struct Sharks {
 
 impl Sharks {
     pub fn new() -> Sharks {
-        Sharks {
-            threshold: u8::MIN,
-        }
+        Sharks { threshold: u8::MIN }
     }
 }
 
@@ -121,7 +119,7 @@ pub trait SecretSharingOperation<S: SecretType> {
     /// // Get 3 shares
     /// let shares: Vec<Share<GF256>> = dealer.take(3).collect();
     #[cfg(feature = "std")]
-    fn dealer(&mut self, threshold:u8, secret: &[S::Inner]) -> Box<dyn Iterator<Item = Share<S>>>;
+    fn dealer(&mut self, threshold: u8, secret: &[S::Inner]) -> Box<dyn Iterator<Item = Share<S>>>;
 
     /// Given an iterable collection of shares, recovers the original secret.
     /// If the number of distinct shares is less than the minimum threshold an `Err` is returned,
@@ -169,7 +167,7 @@ impl<S: SecretType> SecretSharingOperation<S> for Sharks {
     fn recover<T>(&self, shares: T) -> Result<Vec<S::Inner>, &str>
     where
         T: IntoIterator<Item = Share<S>>,
-        T::IntoIter: Iterator<Item = Share<S>>
+        T::IntoIter: Iterator<Item = Share<S>>,
     {
         let mut share_length: Option<usize> = None;
         let mut keys: HashSet<u8> = HashSet::new();
@@ -196,56 +194,117 @@ impl<S: SecretType> SecretSharingOperation<S> for Sharks {
     }
 }
 
-// use secret_type::finite_field::GF256;
-// impl SecretSharingOperation<u8, GF256> for Sharks {}
-
 #[cfg(test)]
 mod tests {
-    use super::{Share, Sharks, secret_type::finite_field::GF256};
-    use alloc::{vec, vec::Vec};
-    use super::SecretSharingOperation;
+    use super::{ SecretSharingOperation, Share, Sharks };
+    use alloc::{ vec, vec::Vec };
 
-    impl Sharks {
-        #[cfg(not(feature = "std"))]
-        fn make_shares(&self, threshold: u8, secret: &[u8]) -> impl Iterator<Item = Share> {
-            use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
+    mod gf256_integration_test {
+        use super::{ vec, SecretSharingOperation, Share, Sharks, Vec };
+        use crate::secret_type::finite_field::GF256;
 
-            let mut rng = ChaCha8Rng::from_seed([0x90; 32]);
-            self.dealer_rng(threshold, secret, &mut rng)
+        impl Sharks {
+            #[cfg(not(feature = "std"))]
+            fn make_gf256_shares(&self, threshold: u8, secret: &[u8]) -> impl Iterator<Item = Share> {
+                use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
+                let mut rng = ChaCha8Rng::from_seed([0x90; 32]);
+                self.dealer_rng(threshold, secret, &mut rng)
+            }
+            #[cfg(feature = "std")]
+            fn make_gf256_shares(
+                &mut self,
+                threshold: u8,
+                secret: &[u8],
+            ) -> impl Iterator<Item = Share<GF256>> {
+                self.dealer(threshold, &secret)
+            }
+        }
+        #[test]
+        fn test_insufficient_shares_err() {
+            let mut sharks = Sharks::new();
+            let shares: Vec<Share<GF256>> = sharks.make_gf256_shares(255, &[1]).take(254).collect();
+            let secret = sharks.recover(shares);
+            assert!(secret.is_err());
+        }
+        #[test]
+        fn test_duplicate_shares_err() {
+            let mut sharks = Sharks::new();
+            let mut shares: Vec<Share<GF256>> = sharks.make_gf256_shares(255, &[1]).take(255).collect();
+            shares[1] = Share {
+                x: shares[0].x,
+                y: shares[0].y.clone(),
+            };
+            let secret = sharks.recover(shares);
+            assert!(secret.is_err());
+        }
+        #[test]
+        fn test_integration_works() {
+            let mut sharks = Sharks::new();
+            let shares: Vec<Share<GF256>> =
+                sharks.make_gf256_shares(255, &[1, 2, 3, 4]).take(255).collect();
+            let secret = sharks.recover(shares).unwrap();
+            assert_eq!(secret, vec![1, 2, 3, 4]);
+        }
+    }
+
+    mod rational_integration_test {
+        use super::{ vec, SecretSharingOperation, Share, Sharks, Vec };
+        use crate::secret_type::rational::Rational;
+        use num_rational::BigRational;
+        use num_traits::cast::FromPrimitive;
+
+        impl Sharks {
+            #[cfg(not(feature = "std"))]
+            fn make_rational_shares(&self, threshold: u8, secret: &[f64]) -> impl Iterator<Item = Share> {
+                use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
+
+                let mut rng = ChaCha8Rng::from_seed([0x90; 32]);
+                self.dealer_rng(threshold, secret, &mut rng)
+            }
+
+            #[cfg(feature = "std")]
+            fn make_rational_shares(
+                &mut self,
+                threshold: u8,
+                secret: &[BigRational],
+            ) -> impl Iterator<Item = Share<Rational>> {
+                self.dealer(threshold, &secret)
+            }
         }
 
-        #[cfg(feature = "std")]
-        fn make_shares(&mut self, threshold: u8, secret: &[u8]) -> impl Iterator<Item = Share<GF256>> {
-            // let secret = secret.iter().map(|x| GF256(x.clone())).collect();
-            self.dealer(threshold, &secret)
+        #[test]
+        fn test_insufficient_shares_err() {
+            let mut sharks = Sharks::new();
+            let secret = vec![BigRational::from_u64(1).unwrap()];
+            let shares: Vec<Share<Rational>> = sharks.make_rational_shares(10, &secret).take(9).collect();
+            let secret = sharks.recover(shares);
+            assert!(secret.is_err());
         }
-    }
 
-    #[test]
-    fn test_insufficient_shares_err() {
-        let mut sharks = Sharks::new();
-        let shares: Vec<Share<GF256>> = sharks.make_shares(255, &[1]).take(254).collect();
-        let secret = sharks.recover(shares);
-        assert!(secret.is_err());
-    }
+        #[test]
+        fn test_duplicate_shares_err() {
+            let mut sharks = Sharks::new();
+            let secret = vec![BigRational::from_u64(1).unwrap()];
+            let mut shares: Vec<Share<Rational>> = sharks.make_rational_shares(10, &secret).take(10).collect();
+            shares[1] = Share {
+                x: shares[0].x,
+                y: shares[0].y.clone(),
+            };
+            let secret = sharks.recover(shares);
+            assert!(secret.is_err());
+        }
 
-    #[test]
-    fn test_duplicate_shares_err() {
-        let mut sharks = Sharks::new();
-        let mut shares: Vec<Share<GF256>> = sharks.make_shares(255, &[1]).take(255).collect();
-        shares[1] = Share {
-            x: shares[0].x,
-            y: shares[0].y.clone(),
-        };
-        let secret = sharks.recover(shares);
-        assert!(secret.is_err());
-    }
-
-    #[test]
-    fn test_integration_works() {
-        let mut sharks = Sharks::new();
-        let shares: Vec<Share<GF256>> = sharks.make_shares(255, &[1, 2, 3, 4]).take(255).collect();
-        let secret = sharks.recover(shares).unwrap();
-        assert_eq!(secret, vec![1, 2, 3, 4]);
+        #[test]
+        fn test_integration_works() {
+            let mut sharks = Sharks::new();
+            let secret_ans = vec![
+                BigRational::from_u64(2).unwrap(), BigRational::from_f64(0.325).unwrap()];
+            let shares: Vec<Share<Rational>> =
+                sharks.make_rational_shares(10, &secret_ans).take(10).collect();
+            let secret_res = sharks.recover(shares).unwrap();
+            assert!(secret_res.iter().zip(secret_ans.iter()).all(
+                |(res, ans)| *res == *ans
+            ));
+        }
     }
 }
