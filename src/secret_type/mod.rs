@@ -56,4 +56,7 @@ pub trait SecretType: 'static + Add + Div + Sub + Mul + Sum + Product + Mul<u8> 
 }
 
 pub mod finite_field;
+pub use finite_field::GF256;
+
 pub mod rational;
+pub use rational::Rational;
