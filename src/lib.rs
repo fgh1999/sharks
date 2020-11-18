@@ -298,7 +298,7 @@ mod tests {
         fn test_integration_works() {
             let mut sharks = Sharks::new();
             let secret_ans = vec![
-                BigRational::from_u64(2).unwrap(), BigRational::from_f64(0.325).unwrap()];
+                BigRational::from_u64(2).unwrap(), BigRational::from_f64(0.32423).unwrap()];
             let shares: Vec<Share<Rational>> =
                 sharks.make_rational_shares(10, &secret_ans).take(10).collect();
             let secret_res = sharks.recover(shares).unwrap();
