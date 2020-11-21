@@ -41,6 +41,9 @@
 pub mod secret_type;
 mod share;
 
+pub use num_rational;
+pub use num_traits;
+
 extern crate alloc;
 
 use alloc::boxed::Box;
