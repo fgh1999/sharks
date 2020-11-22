@@ -25,8 +25,13 @@ fuzzing = ["std", "arbitrary"]
 rand = { version = "^0.7", default-features = false }
 hashbrown = "^0.7"
 arbitrary = {version = "^0.4", features = ["derive"], optional = true}
-num-rational = "^0.3"
+num-rational = { version = "^0.3", features = ["serde"] }
 num-traits = "^0.2.11"
+
+# for serde
+serde = { version = "^1.0.99", default-features = false, features = ["derive"] }
+rmp-serde = "^0.14.4"
+num-bigint = { version = "^0.3.0", features = ["serde"] }
 
 [dev-dependencies]
 criterion = "^0.3"

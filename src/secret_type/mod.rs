@@ -2,8 +2,8 @@ use core::ops::{Add, Div, Mul, Sub};
 use core::iter::{Sum, Product};
 use super::share::Share;
 
-pub trait SecretType: 'static + Add + Div + Sub + Mul + Sum + Product + Mul<u8> + From<u8> 
-{
+pub trait SecretType: Add + Div + Sub + Mul + Sum + Product 
+    + Mul<u8> + From<u8> + serde::Serialize + serde::de::DeserializeOwned {
     /// Inner type of SecretType
     type Inner;
 

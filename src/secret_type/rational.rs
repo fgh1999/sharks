@@ -5,8 +5,9 @@ use super::SecretType;
 use crate::Share;
 use num_rational::BigRational;
 use num_traits::cast::FromPrimitive;
+use serde::{ Serialize, Deserialize };
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzzing", derive(Arbitrary))]
 pub struct Rational {
     inner: BigRational,
