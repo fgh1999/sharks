@@ -309,5 +309,65 @@ mod tests {
                 |(res, ans)| *res == *ans
             ));
         }
+
+        #[test]
+        fn test_additive_homophism_for_times() {
+            for _ in 0..10 {
+                test_additive_homomorphism();
+            }
+        }
+
+        fn test_additive_homomorphism() {
+            let mut sharks = Sharks::new();
+            let threshold = 3;
+            let dealer_n = 10;
+            let mut shares_set = Vec::with_capacity(dealer_n);
+            let mut ds_i_pairs = Vec::with_capacity(dealer_n);
+            for _ in 0..dealer_n {
+                use rand::prelude::*;
+                let mut rng = rand::thread_rng();
+                let d_i: f64 = rng.gen();
+                assert!(d_i <= 1.0 && d_i >= 0.0);
+                let d_i = BigRational::from_f64(d_i).unwrap();
+                let if_this_is_the_event: bool = rand::random();
+                let s_i = BigRational::from_u8(if if_this_is_the_event { 1 } else { 0 }).unwrap();
+                let d_i = if if_this_is_the_event { d_i } else { BigRational::from_u8(0).unwrap() };
+                let secret_ans_i = vec![d_i.clone(), s_i.clone()];
+                let shares_i: Vec<Share<Rational>> =
+                    sharks.make_rational_shares(threshold, &secret_ans_i).take(dealer_n).collect();
+                shares_set.push(shares_i);
+                ds_i_pairs.push((d_i, s_i));
+            }
+
+            // summation
+            let mut summation_results = Vec::with_capacity(threshold as usize);
+            for k in 0..threshold as usize {
+                let received_shares: Vec<Share<Rational>> = shares_set.iter()
+                    .map(|shares| shares[k].clone()).collect();
+                assert!(received_shares.iter().all(|x| x.y.len() == 2)); // (\hat{d_j^k}, \hat{s_j^k})
+                let x = received_shares[0].x.clone();
+                assert!(received_shares.iter().all(|shares| shares.x == x));
+
+                let d_jk: Rational = received_shares.iter()
+                    .map(|share| share.y[0].clone()).sum();
+                let s_jk = received_shares.iter()
+                    .map(|share| share.y[1].clone()).sum();
+                let summation_result = Share {
+                    x: received_shares[0].x,
+                    y: vec![d_jk, s_jk]
+                };
+                summation_results.push(summation_result);
+            }
+
+            // resolve (d_j, s_j)
+            let secret_res = sharks.recover(summation_results).unwrap();
+            let sum_d: BigRational = ds_i_pairs.iter().map(|pair| pair.0.clone()).sum();
+            assert_eq!(sum_d, secret_res[0]);
+            let sum_s: BigRational = ds_i_pairs.iter().map(|pair| pair.1.clone()).sum();
+            assert_eq!(sum_s, secret_res[1]);
+            use num_traits::ToPrimitive;
+            let rho_j = (secret_res[0].clone() / secret_res[1].clone()).to_f64().unwrap();
+            assert!(rho_j <= 1.0 && rho_j >= 0.0, "rho_j is not valid(0 <= rho_j <= 1)");
+        }
     }
 }
