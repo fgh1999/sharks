@@ -213,6 +213,14 @@ impl Product for Rational {
     }
 }
 
+impl From<BigRational> for Rational {
+    fn from(inner: BigRational) -> Self {
+        Rational {
+            inner
+        }
+}
+}
+
 #[cfg(test)]
 mod tests {
     use super::Rational;
