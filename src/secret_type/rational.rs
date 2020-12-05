@@ -218,7 +218,12 @@ impl From<BigRational> for Rational {
         Rational {
             inner
         }
+    }
 }
+impl Into<BigRational> for Rational {
+    fn into(self) -> BigRational {
+        self.inner
+    }
 }
 
 #[cfg(test)]
