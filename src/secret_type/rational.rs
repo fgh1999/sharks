@@ -145,6 +145,7 @@ impl SecretType for Rational {
                 shares
                     .iter()
                     .map(|s_i| {
+                        assert_ne!(s_i.x, 0);
                         let product = shares
                                         .iter()
                                         .filter(|s_j| s_j.x != s_i.x)

@@ -312,15 +312,17 @@ mod tests {
 
         #[test]
         fn test_additive_homophism_for_times() {
-            for _ in 0..10 {
-                test_additive_homomorphism();
+            for i in 0..10 {
+                println!("test_additive_homophism: round: {}", i + 1);
+                test_additive_homomorphism(3, 5);
             }
         }
 
-        fn test_additive_homomorphism() {
-            let mut sharks = Sharks::new();
-            let threshold = 3;
-            let dealer_n = 10;
+        fn test_additive_homomorphism(threshold: u8, dealer_n: usize) {
+            assert!(usize::from(threshold) <= dealer_n);
+            println!("threshold: {}, dealer_n: {}", threshold, dealer_n);
+
+            let mut shark = Sharks::new();
             let mut shares_set = Vec::with_capacity(dealer_n);
             let mut ds_i_pairs = Vec::with_capacity(dealer_n);
             for _ in 0..dealer_n {
@@ -334,7 +336,7 @@ mod tests {
                 let d_i = if if_this_is_the_event { d_i } else { BigRational::from_u8(0).unwrap() };
                 let secret_ans_i = vec![d_i.clone(), s_i.clone()];
                 let shares_i: Vec<Share<Rational>> =
-                    sharks.make_rational_shares(threshold, &secret_ans_i).take(dealer_n).collect();
+                    shark.make_rational_shares(threshold, &secret_ans_i).take(dealer_n).collect();
                 shares_set.push(shares_i);
                 ds_i_pairs.push((d_i, s_i));
             }
@@ -356,11 +358,13 @@ mod tests {
                     x: received_shares[0].x,
                     y: vec![d_jk, s_jk]
                 };
+
+                // receive summation results
                 summation_results.push(summation_result);
             }
 
             // resolve (d_j, s_j)
-            let secret_res = sharks.recover(summation_results).unwrap();
+            let secret_res = shark.recover(summation_results).unwrap();
             let sum_d: BigRational = ds_i_pairs.iter().map(|pair| pair.0.clone()).sum();
             assert_eq!(sum_d, secret_res[0]);
             let sum_s: BigRational = ds_i_pairs.iter().map(|pair| pair.1.clone()).sum();
